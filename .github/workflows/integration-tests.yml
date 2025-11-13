@@ -7,9 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
-  integration:
-    runs-on: ubuntu-latest
-    env:
+    integration:
+      runs-on: ubuntu-latest
+      env:
       PORT: 3000
       BASE_URL: http://localhost:3000
 
