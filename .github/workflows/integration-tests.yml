@@ -56,7 +56,9 @@ jobs:
 
       - name: Run Newman collection
         run: |
-          NEWMAN_COLLECTION="./userAPI.postman_collection.json"
+          # exact collection filename present in repo
+          NEWMAN_COLLECTION="./UserAPI-Tests.postman_collection.json"
+          echo "Using collection: $NEWMAN_COLLECTION"
           if [ ! -f "$NEWMAN_COLLECTION" ]; then
             echo "ERROR: collection file not found: $NEWMAN_COLLECTION"
             ls -la
