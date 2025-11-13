@@ -1,0 +1,78 @@
+name: Integration Tests (Newman)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      PORT: 3000
+      BASE_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start API server in background
+        # nohup + & so server keeps running in background
+        run: |
+          mkdir -p reports
+          nohup node app.js > server.log 2>&1 & echo $! > server.pid
+          echo "started server with pid $(cat server.pid)"
+      
+      - name: Wait for server /health to respond
+        run: |
+          echo "Waiting for ${BASE_URL}/health ..."
+          for i in {1..20}; do
+            if curl -sSf "${BASE_URL}/health" >/dev/null; then
+              echo "Server ready!"
+              break
+            fi
+            echo "waiting... ($i)"
+            sleep 1
+          done
+          curl -v "${BASE_URL}/health" || (echo "health check failed" && cat server.log && exit 1)
+
+      - name: Install Newman
+        run: npm install -g newman newman-reporter-html
+
+      - name: Run Newman collection
+        run: |
+          newman run userAPI.postman_collection.json \
+            --env-var "baseUrl=${BASE_URL}" \
+            --env-var "unique=ci_${GITHUB_RUN_NUMBER}" \
+            -r cli,html \
+            --reporter-html-export reports/newman-report.html
+        continue-on-error: false
+
+      - name: Upload Newman HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-report
+          path: reports/newman-report.html
+
+      - name: Upload server log (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log
+          path: server.log
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm -f server.pid
+          fi
